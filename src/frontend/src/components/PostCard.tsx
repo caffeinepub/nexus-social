@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +15,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   Share2,
+  Trash2,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
@@ -21,6 +23,7 @@ import { toast } from "sonner";
 import type { Post, UserProfile } from "../hooks/useQueries";
 import {
   useAddComment,
+  useDeletePost,
   useGetComments,
   useGetPostLikes,
   useLikePost,
@@ -51,6 +54,9 @@ export default function PostCard({
   const { data: comments = [] } = useGetComments(post.id);
   const likePost = useLikePost();
   const addComment = useAddComment();
+  const deletePost = useDeletePost();
+
+  const isOwner = authorId.toString() === currentUserId;
 
   const handleLike = async () => {
     if (likedLocally) return;
@@ -68,6 +74,16 @@ export default function PostCard({
   const handleShare = () => {
     navigator.clipboard.writeText(window.location.href);
     toast.success("Link copied to clipboard");
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Kya aap is post ko delete karna chahte hain?")) return;
+    try {
+      await deletePost.mutateAsync(post.id);
+      toast.success("Post delete ho gayi!");
+    } catch {
+      toast.error("Post delete nahi hui");
+    }
   };
 
   const handleComment = async (e: React.FormEvent) => {
@@ -112,7 +128,7 @@ export default function PostCard({
             <span className="text-sm font-semibold truncate">
               {displayName}
             </span>
-            {authorId.toString() === currentUserId && (
+            {isOwner && (
               <span className="text-[10px] bg-accent text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">
                 You
               </span>
@@ -141,6 +157,19 @@ export default function PostCard({
             >
               Copy text
             </DropdownMenuItem>
+            {isOwner && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleDelete}
+                  className="text-destructive focus:text-destructive"
+                  disabled={deletePost.isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete post
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

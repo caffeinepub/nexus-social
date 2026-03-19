@@ -146,6 +146,21 @@ export function useCreatePost() {
   });
 }
 
+export function useDeletePost() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (postId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.deletePost(postId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["feed"] });
+      qc.invalidateQueries({ queryKey: ["userFeed"] });
+    },
+  });
+}
+
 export function useLikePost() {
   const { actor } = useActor();
   const qc = useQueryClient();

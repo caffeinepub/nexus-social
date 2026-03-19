@@ -135,7 +135,57 @@ export default function FeedPage() {
   const hasPosts = posts && posts.length > 0;
 
   return (
-    <div className="max-w-[1100px] mx-auto px-4 py-6">
+    <div className="max-w-[1100px] mx-auto px-4 py-6 space-y-4">
+      {/* Mobile-only top strip (hidden on lg+) */}
+      <div className="lg:hidden space-y-3" data-ocid="feed.mobile.panel">
+        {/* Members count */}
+        <div className="bg-card border border-border rounded-xl shadow-card px-4 py-3 flex items-center gap-3">
+          <div className="w-9 h-9 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+            <Users className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-xl font-bold leading-none">{allUsers.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Registered Members
+            </p>
+          </div>
+        </div>
+
+        {/* People horizontal scroll */}
+        {otherUsers.length > 0 && (
+          <div className="bg-card border border-border rounded-xl shadow-card overflow-hidden">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground px-4 pt-3 pb-1">
+              People
+            </p>
+            <div className="flex gap-3 overflow-x-auto px-4 pb-3 scrollbar-hide">
+              {otherUsers.map(([uid, person], i) => {
+                const name = person.displayName || uid.toString().slice(0, 8);
+                const avatarBlobUrl = person.avatarBlob?.getDirectURL();
+                return (
+                  <div
+                    key={uid.toString()}
+                    className="flex flex-col items-center gap-1.5 shrink-0 w-14"
+                    data-ocid={`feed.mobile.people.item.${i + 1}`}
+                  >
+                    <Avatar className="h-10 w-10">
+                      {avatarBlobUrl && (
+                        <AvatarImage src={avatarBlobUrl} alt={name} />
+                      )}
+                      <AvatarFallback className="text-xs font-semibold bg-primary/10 text-foreground">
+                        {getInitials(name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p className="text-[10px] font-semibold text-foreground text-center leading-tight line-clamp-2 w-full">
+                      {name}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex gap-6">
         {/* Main feed column */}
         <main className="flex-1 min-w-0 space-y-4">
@@ -314,7 +364,7 @@ export default function FeedPage() {
           )}
         </main>
 
-        {/* Right sidebar */}
+        {/* Right sidebar — desktop only */}
         <aside className="w-72 shrink-0 hidden lg:block space-y-4">
           {/* Members stat card */}
           <motion.div

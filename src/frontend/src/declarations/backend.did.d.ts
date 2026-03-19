@@ -94,6 +94,7 @@ export interface _SERVICE {
   'getUserFeed' : ActorMethod<[UserId], Array<Post>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'deletePost' : ActorMethod<[bigint], undefined>,
   'likePost' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'sendMessage' : ActorMethod<[UserId, string], undefined>,

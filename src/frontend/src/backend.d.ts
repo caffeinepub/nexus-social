@@ -72,6 +72,7 @@ export interface backendInterface {
     getUserFeed(userId: UserId): Promise<Array<Post>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    deletePost(postId: bigint): Promise<void>;
     likePost(postId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     sendMessage(recipient: UserId, content: string): Promise<void>;

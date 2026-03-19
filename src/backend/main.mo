@@ -125,6 +125,23 @@ actor {
     post.id;
   };
 
+  public shared ({ caller }) func deletePost(postId : Nat) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can delete posts");
+    };
+    switch (posts.get(postId)) {
+      case (null) { Runtime.trap("Post not found") };
+      case (?post) {
+        if (post.author != caller and not AccessControl.isAdmin(accessControlState, caller)) {
+          Runtime.trap("Unauthorized: Only the author can delete this post");
+        };
+        posts.remove(postId);
+        likes.remove(postId);
+        comments.remove(postId);
+      };
+    };
+  };
+
   public query ({ caller }) func getPost(postId : Nat) : async Post {
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };

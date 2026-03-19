@@ -165,6 +165,7 @@ export interface backendInterface {
     getUserFeed(userId: UserId): Promise<Array<Post>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
+    deletePost(postId: bigint): Promise<void>;
     likePost(postId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     sendMessage(recipient: UserId, content: string): Promise<void>;
@@ -549,6 +550,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.isCallerAdmin();
+            return result;
+        }
+    }
+    async deletePost(arg0: bigint): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.deletePost(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.deletePost(arg0);
             return result;
         }
     }
