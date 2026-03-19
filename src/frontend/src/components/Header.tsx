@@ -9,11 +9,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Edit, LogOut, Search, User } from "lucide-react";
-import { useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Edit, LogOut, Search, User, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
-import { useGetCallerUserProfile } from "../hooks/useQueries";
+import { useGetAllUsers, useGetCallerUserProfile } from "../hooks/useQueries";
 import { getInitials } from "../utils/format";
 import NotificationsDropdown from "./NotificationsDropdown";
 
@@ -33,9 +33,52 @@ export default function Header({ onCompose }: Props) {
   const { identity, clear } = useInternetIdentity();
   const qc = useQueryClient();
   const { data: profile } = useGetCallerUserProfile();
+  const { data: allUsers } = useGetAllUsers();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
   const [searchValue, setSearchValue] = useState("");
+  const [showResults, setShowResults] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const currentPrincipal = identity?.getPrincipal().toString();
+
+  const filteredUsers = (allUsers ?? [])
+    .filter(([principal, prof]) => {
+      if (principal.toString() === currentPrincipal) return false;
+      const q = searchValue.toLowerCase();
+      return (
+        prof.displayName.toLowerCase().includes(q) ||
+        prof.bio.toLowerCase().includes(q)
+      );
+    })
+    .slice(0, 6);
+
+  useEffect(() => {
+    function handleMouseDown(e: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setShowResults(false);
+      }
+    }
+    document.addEventListener("mousedown", handleMouseDown);
+    return () => document.removeEventListener("mousedown", handleMouseDown);
+  }, []);
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Escape") {
+      setShowResults(false);
+      setSearchValue("");
+    }
+  }
+
+  function handleUserClick() {
+    navigate({ to: "/explore" });
+    setSearchValue("");
+    setShowResults(false);
+  }
 
   const handleLogout = async () => {
     await clear();
@@ -51,6 +94,8 @@ export default function Header({ onCompose }: Props) {
     if (!p || p.length <= 10) return p;
     return `${p.slice(0, 5)}...${p.slice(-4)}`;
   }
+
+  const showDropdown = showResults && searchValue.trim().length > 0;
 
   return (
     <header className="sticky top-0 z-40 bg-card border-b border-border shadow-xs">
@@ -94,16 +139,77 @@ export default function Header({ onCompose }: Props) {
         </nav>
 
         {/* Search */}
-        <div className="flex-1 max-w-xs hidden lg:block">
+        <div
+          className="flex-1 max-w-xs hidden lg:block"
+          ref={searchContainerRef}
+        >
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Search Nexus…"
               value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
+              onChange={(e) => {
+                setSearchValue(e.target.value);
+                setShowResults(true);
+              }}
+              onFocus={() => setShowResults(true)}
+              onKeyDown={handleKeyDown}
               className="pl-9 h-8 rounded-full text-sm bg-accent border-transparent focus:border-border"
               data-ocid="header.search_input"
             />
+
+            {/* Search Results Dropdown */}
+            {showDropdown && (
+              <div
+                className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden"
+                data-ocid="header.popover"
+              >
+                {filteredUsers.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-6 text-muted-foreground">
+                    <Users className="h-5 w-5" />
+                    <span className="text-xs">Koi user nahi mila</span>
+                  </div>
+                ) : (
+                  <ul>
+                    {filteredUsers.map(([principal, prof], idx) => {
+                      const userAvatar = prof.avatarBlob?.getDirectURL();
+                      const name =
+                        prof.displayName ||
+                        shortPrincipal(principal.toString());
+                      return (
+                        <li key={principal.toString()}>
+                          <button
+                            type="button"
+                            className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-accent transition-colors text-left"
+                            onClick={handleUserClick}
+                            data-ocid={`search.item.${idx + 1}`}
+                          >
+                            <Avatar className="h-8 w-8 shrink-0">
+                              {userAvatar && (
+                                <AvatarImage src={userAvatar} alt={name} />
+                              )}
+                              <AvatarFallback className="text-xs font-semibold bg-primary text-primary-foreground">
+                                {getInitials(name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate text-foreground">
+                                {name}
+                              </p>
+                              {prof.bio && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  {prof.bio}
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
