@@ -36,6 +36,7 @@ interface Props {
   authorId: Principal;
   currentUserId: string;
   index: number;
+  userMap?: Map<string, UserProfile>;
 }
 
 export default function PostCard({
@@ -44,6 +45,7 @@ export default function PostCard({
   authorId,
   currentUserId,
   index,
+  userMap = new Map(),
 }: Props) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -95,7 +97,7 @@ export default function PostCard({
         content: commentText.trim(),
       });
       setCommentText("");
-      toast.success("Comment added");
+      toast.success("Comment add ho gaya!");
     } catch {
       toast.error("Failed to add comment");
     }
@@ -250,32 +252,57 @@ export default function PostCard({
             <div className="p-4 space-y-3">
               {comments.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">
-                  No comments yet. Be the first!
+                  Koi comment nahi abhi tak. Pehle comment karo!
                 </p>
               ) : (
-                comments.map((c) => (
-                  <div
-                    key={`${c.timestamp}`}
-                    className="flex gap-2"
-                    data-ocid={`feed.item.${index + 1}.row`}
-                  >
-                    <div className="w-6 h-6 bg-accent rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[9px] font-semibold text-foreground">
-                        {c.author.toString().slice(0, 2).toUpperCase()}
-                      </span>
+                comments.map((c) => {
+                  const commenterProfile = userMap.get(c.author.toString());
+                  const commenterName =
+                    commenterProfile?.displayName ||
+                    `User ${c.author.toString().slice(0, 8)}`;
+                  const commenterAvatar =
+                    commenterProfile?.avatarBlob?.getDirectURL();
+                  const isCurrentUser = c.author.toString() === currentUserId;
+                  return (
+                    <div
+                      key={`${c.timestamp}`}
+                      className="flex gap-2"
+                      data-ocid={`feed.item.${index + 1}.row`}
+                    >
+                      <Avatar className="w-7 h-7 shrink-0 mt-0.5">
+                        {commenterAvatar && (
+                          <AvatarImage
+                            src={commenterAvatar}
+                            alt={commenterName}
+                          />
+                        )}
+                        <AvatarFallback className="text-[9px] font-semibold bg-primary/10 text-foreground">
+                          {getInitials(commenterName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="bg-accent rounded-xl px-3 py-2 flex-1">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <p className="text-xs font-semibold text-foreground">
+                            {commenterName}
+                          </p>
+                          {isCurrentUser && (
+                            <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                              You
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-foreground">{c.content}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {formatTimestamp(c.timestamp)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="bg-accent rounded-lg px-3 py-2 flex-1">
-                      <p className="text-xs text-foreground">{c.content}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        {formatTimestamp(c.timestamp)}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
               <form onSubmit={handleComment} className="flex gap-2">
                 <Textarea
-                  placeholder="Write a comment…"
+                  placeholder="Comment likho…"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   className="resize-none min-h-[36px] h-9 py-2 text-xs rounded-full"

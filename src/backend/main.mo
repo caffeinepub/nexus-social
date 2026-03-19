@@ -10,8 +10,10 @@ import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
+
 import MixinAuthorization "authorization/MixinAuthorization";
 import AccessControl "authorization/access-control";
+
 
 actor {
   include MixinStorage();
@@ -34,6 +36,7 @@ actor {
     content : Text;
     imageBlob : ?Storage.ExternalBlob;
     timestamp : Time.Time;
+    category : ?Text;
   };
 
   type Comment = {
@@ -118,11 +121,51 @@ actor {
       content;
       imageBlob;
       timestamp = Time.now();
+      category = null;
     };
 
     posts.add(nextPostId, post);
     nextPostId += 1;
     post.id;
+  };
+
+  public shared ({ caller }) func createDiscussionPost(title : Text, content : Text, category : Text) : async Nat {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
+      Runtime.trap("Unauthorized: Only users can create discussion posts");
+    };
+
+    let post : Post = {
+      id = nextPostId;
+      author = caller;
+      content = title # "\n" # content;
+      imageBlob = null;
+      timestamp = Time.now();
+      category = ?category;
+    };
+
+    posts.add(nextPostId, post);
+    nextPostId += 1;
+    post.id;
+  };
+
+  public query ({ caller }) func getPostsByCategory(category : Text) : async [Post] {
+    let filteredPosts = posts.values().filter(
+      func(post) {
+        switch (post.category) {
+          case (null) { false };
+          case (?cat) { cat == category };
+        };
+      }
+    );
+    filteredPosts.toArray().sort(
+      func(post1, post2) {
+        if (post1.timestamp > post2.timestamp) { #less } else {
+          if (post1.timestamp < post2.timestamp) { #greater } else {
+            #equal;
+          };
+        };
+      }
+    );
   };
 
   public shared ({ caller }) func deletePost(postId : Nat) : async () {

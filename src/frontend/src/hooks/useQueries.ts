@@ -39,7 +39,8 @@ export function useGetCallerUserProfile() {
       return actor.getCallerUserProfile();
     },
     enabled: !!actor && !actorFetching,
-    retry: false,
+    retry: 2,
+    retryDelay: 1000,
   });
   return {
     ...query,
@@ -274,9 +275,122 @@ export function useUpdateProfile() {
       if (!actor) throw new Error("Not connected");
       return actor.updateProfile(displayName, bio, avatarBlob);
     },
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
+      // Immediately set cache so profile setup modal closes right away
+      qc.setQueryData<UserProfile | null>(["currentUserProfile"], {
+        displayName: vars.displayName,
+        bio: vars.bio,
+        avatarBlob: undefined,
+      });
       qc.invalidateQueries({ queryKey: ["currentUserProfile"] });
       qc.invalidateQueries({ queryKey: ["allUsers"] });
+    },
+  });
+}
+
+export function useGetPostsByCategory(category: string) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Post[]>({
+    queryKey: ["posts", "category", category],
+    queryFn: async () => {
+      if (!actor) return [];
+      const posts = await actor.getPostsByCategory(category);
+      return [...posts].sort((a, b) => Number(b.timestamp - a.timestamp));
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreateDiscussionPost() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      title,
+      content,
+      category,
+    }: {
+      title: string;
+      content: string;
+      category: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.createDiscussionPost(title, content, category);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["posts", "category", vars.category] });
+    },
+  });
+}
+
+// ─── Real Talks / Shadow Posts ───────────────────────────────────────────────
+
+export function useGetRealTalksFeed() {
+  const { actor, isFetching } = useActor();
+  return useQuery<Post[]>({
+    queryKey: ["posts", "category", "shadow"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const posts = await actor.getPostsByCategory("shadow");
+      return [...posts].sort((a, b) => Number(b.timestamp - a.timestamp));
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useCreateShadowPost() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      content,
+      randomTag,
+    }: {
+      content: string;
+      randomTag: string;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.createDiscussionPost(randomTag, content, "shadow");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["posts", "category", "shadow"] });
+    },
+  });
+}
+
+export function useGetReactions(postId: bigint) {
+  const { actor, isFetching } = useActor();
+  return useQuery<Record<string, number>>({
+    queryKey: ["reactions", postId.toString()],
+    queryFn: async () => {
+      if (!actor) return {};
+      const comments = await actor.getComments(postId);
+      const counts: Record<string, number> = {};
+      for (const c of comments) {
+        if (c.content.startsWith("__reaction__")) {
+          const key = c.content.replace("__reaction__", "");
+          counts[key] = (counts[key] ?? 0) + 1;
+        }
+      }
+      return counts;
+    },
+    enabled: !!actor && !isFetching,
+  });
+}
+
+export function useAddReaction() {
+  const { actor } = useActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      postId,
+      reaction,
+    }: { postId: bigint; reaction: string }) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.addComment(postId, `__reaction__${reaction}`);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["reactions", vars.postId.toString()] });
     },
   });
 }

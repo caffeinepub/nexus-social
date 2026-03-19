@@ -33,6 +33,7 @@ export const Post = IDL.Record({
   'imageBlob' : IDL.Opt(ExternalBlob),
   'author' : UserId,
   'timestamp' : Time,
+  'category' : IDL.Opt(IDL.Text),
 });
 export const UserProfile = IDL.Record({
   'bio' : IDL.Text,
@@ -88,7 +89,13 @@ export const idlService = IDL.Service({
   '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
   'addComment' : IDL.Func([IDL.Nat, IDL.Text], [], []),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+  'createDiscussionPost' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Nat],
+      [],
+    ),
   'createPost' : IDL.Func([IDL.Text, IDL.Opt(ExternalBlob)], [IDL.Nat], []),
+  'deletePost' : IDL.Func([IDL.Nat], [], []),
   'followUser' : IDL.Func([UserId], [], []),
   'getAllPosts' : IDL.Func([], [IDL.Vec(Post)], ['query']),
   'getAllUsers' : IDL.Func(
@@ -106,6 +113,7 @@ export const idlService = IDL.Service({
   'getMessages' : IDL.Func([UserId], [IDL.Vec(Message)], ['query']),
   'getNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
   'getPost' : IDL.Func([IDL.Nat], [Post], ['query']),
+  'getPostsByCategory' : IDL.Func([IDL.Text], [IDL.Vec(Post)], ['query']),
   'getProfile' : IDL.Func([UserId], [UserProfile], ['query']),
   'getUserFeed' : IDL.Func([UserId], [IDL.Vec(Post)], ['query']),
   'getUserProfile' : IDL.Func(
@@ -114,7 +122,6 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'deletePost' : IDL.Func([IDL.Nat], [], []),
   'likePost' : IDL.Func([IDL.Nat], [], []),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], ['query']),
   'sendMessage' : IDL.Func([UserId, IDL.Text], [], []),
@@ -154,6 +161,7 @@ export const idlFactory = ({ IDL }) => {
     'imageBlob' : IDL.Opt(ExternalBlob),
     'author' : UserId,
     'timestamp' : Time,
+    'category' : IDL.Opt(IDL.Text),
   });
   const UserProfile = IDL.Record({
     'bio' : IDL.Text,
@@ -209,7 +217,13 @@ export const idlFactory = ({ IDL }) => {
     '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
     'addComment' : IDL.Func([IDL.Nat, IDL.Text], [], []),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
+    'createDiscussionPost' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Nat],
+        [],
+      ),
     'createPost' : IDL.Func([IDL.Text, IDL.Opt(ExternalBlob)], [IDL.Nat], []),
+    'deletePost' : IDL.Func([IDL.Nat], [], []),
     'followUser' : IDL.Func([UserId], [], []),
     'getAllPosts' : IDL.Func([], [IDL.Vec(Post)], ['query']),
     'getAllUsers' : IDL.Func(
@@ -227,6 +241,7 @@ export const idlFactory = ({ IDL }) => {
     'getMessages' : IDL.Func([UserId], [IDL.Vec(Message)], ['query']),
     'getNotifications' : IDL.Func([], [IDL.Vec(Notification)], ['query']),
     'getPost' : IDL.Func([IDL.Nat], [Post], ['query']),
+    'getPostsByCategory' : IDL.Func([IDL.Text], [IDL.Vec(Post)], ['query']),
     'getProfile' : IDL.Func([UserId], [UserProfile], ['query']),
     'getUserFeed' : IDL.Func([UserId], [IDL.Vec(Post)], ['query']),
     'getUserProfile' : IDL.Func(
@@ -235,8 +250,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'deletePost' : IDL.Func([IDL.Nat], [], []),
-  'likePost' : IDL.Func([IDL.Nat], [], []),
+    'likePost' : IDL.Func([IDL.Nat], [], []),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], ['query']),
     'sendMessage' : IDL.Func([UserId, IDL.Text], [], []),
     'unfollowUser' : IDL.Func([UserId], [], []),

@@ -10,7 +10,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { Edit, LogOut, Search, User, Users } from "lucide-react";
+import { Edit, Ghost, LogOut, Search, User, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import { useGetAllUsers, useGetCallerUserProfile } from "../hooks/useQueries";
@@ -19,10 +19,12 @@ import NotificationsDropdown from "./NotificationsDropdown";
 
 const NAV_LINKS = [
   { label: "Feed", to: "/" },
+  { label: "Real Talks", to: "/real-talks", icon: true },
+  { label: "Discussions", to: "/discussions" },
+  { label: "Knowledge", to: "/knowledge" },
   { label: "Messages", to: "/messages" },
   { label: "Communities", to: "/explore" },
   { label: "Profile", to: "/profile" },
-  { label: "Explore", to: "/explore" },
 ];
 
 interface Props {
@@ -99,11 +101,11 @@ export default function Header({ onCompose }: Props) {
 
   return (
     <header className="sticky top-0 z-40 bg-card border-b border-border shadow-xs">
-      <div className="max-w-[1200px] mx-auto px-4 h-14 flex items-center gap-4">
+      <div className="max-w-[1200px] mx-auto px-4 h-14 flex items-center gap-2 sm:gap-4">
         {/* Brand */}
         <Link
           to="/"
-          className="flex items-center gap-2 shrink-0 mr-2"
+          className="flex items-center gap-2 shrink-0 mr-1 sm:mr-2"
           data-ocid="header.link"
         >
           <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center">
@@ -116,22 +118,28 @@ export default function Header({ onCompose }: Props) {
 
         {/* Nav */}
         <nav className="hidden md:flex items-center gap-0.5">
-          {NAV_LINKS.map(({ label, to }) => {
+          {NAV_LINKS.map(({ label, to, icon }) => {
             const isActive =
               label === "Feed"
                 ? currentPath === "/"
                 : currentPath.startsWith(to) && to !== "/";
+            const isRealTalks = label === "Real Talks";
             return (
               <Link
                 key={label}
                 to={to}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-1 ${
                   isActive
-                    ? "text-foreground bg-accent"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    ? isRealTalks
+                      ? "text-violet-400 bg-violet-500/10"
+                      : "text-foreground bg-accent"
+                    : isRealTalks
+                      ? "text-violet-400/70 hover:text-violet-400 hover:bg-violet-500/10"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
-                data-ocid={`nav.${label.toLowerCase()}.link`}
+                data-ocid={`nav.${label.toLowerCase().replace(" ", "-")}.link`}
               >
+                {icon && <Ghost className="h-3.5 w-3.5" />}
                 {label}
               </Link>
             );
@@ -140,13 +148,13 @@ export default function Header({ onCompose }: Props) {
 
         {/* Search */}
         <div
-          className="flex-1 max-w-xs hidden lg:block"
+          className="flex-1 min-w-0 max-w-[160px] sm:max-w-xs"
           ref={searchContainerRef}
         >
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
-              placeholder="Search Nexus…"
+              placeholder="Search…"
               value={searchValue}
               onChange={(e) => {
                 setSearchValue(e.target.value);
@@ -158,7 +166,6 @@ export default function Header({ onCompose }: Props) {
               data-ocid="header.search_input"
             />
 
-            {/* Search Results Dropdown */}
             {showDropdown && (
               <div
                 className="absolute top-full left-0 right-0 mt-1.5 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden"
@@ -214,10 +221,8 @@ export default function Header({ onCompose }: Props) {
         </div>
 
         <div className="ml-auto flex items-center gap-1">
-          {/* Notifications */}
           <NotificationsDropdown />
 
-          {/* Avatar dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -258,15 +263,14 @@ export default function Header({ onCompose }: Props) {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Create button */}
           <Button
             size="sm"
-            className="rounded-full h-8 px-4 text-xs font-semibold ml-1"
+            className="rounded-full h-8 px-3 sm:px-4 text-xs font-semibold ml-1"
             onClick={onCompose}
             data-ocid="header.primary_button"
           >
-            <Edit className="h-3.5 w-3.5 mr-1.5" />
-            Create
+            <Edit className="h-3.5 w-3.5 sm:mr-1.5" />
+            <span className="hidden sm:inline">Create</span>
           </Button>
         </div>
       </div>

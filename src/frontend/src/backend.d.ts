@@ -28,6 +28,7 @@ export interface Post {
     imageBlob?: ExternalBlob;
     author: UserId;
     timestamp: Time;
+    category?: string;
 }
 export interface Notification {
     id: Time;
@@ -54,7 +55,9 @@ export enum UserRole {
 export interface backendInterface {
     addComment(postId: bigint, content: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
+    createDiscussionPost(title: string, content: string, category: string): Promise<bigint>;
     createPost(content: string, imageBlob: ExternalBlob | null): Promise<bigint>;
+    deletePost(postId: bigint): Promise<void>;
     followUser(target: UserId): Promise<void>;
     getAllPosts(): Promise<Array<Post>>;
     getAllUsers(): Promise<Array<[UserId, UserProfile]>>;
@@ -68,11 +71,11 @@ export interface backendInterface {
     getMessages(userId: UserId): Promise<Array<Message>>;
     getNotifications(): Promise<Array<Notification>>;
     getPost(postId: bigint): Promise<Post>;
+    getPostsByCategory(category: string): Promise<Array<Post>>;
     getProfile(userId: UserId): Promise<UserProfile>;
     getUserFeed(userId: UserId): Promise<Array<Post>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
-    deletePost(postId: bigint): Promise<void>;
     likePost(postId: bigint): Promise<void>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     sendMessage(recipient: UserId, content: string): Promise<void>;

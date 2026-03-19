@@ -1,11 +1,10 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import type { Principal } from "@dfinity/principal";
 import { Link } from "@tanstack/react-router";
-import { Image, Loader2, Plus, Send, Users } from "lucide-react";
+import { Ghost, Image, Loader2, Plus, Send, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -13,13 +12,25 @@ import { ExternalBlob } from "../backend";
 import PostCard from "../components/PostCard";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
+  useCreateDiscussionPost,
   useCreatePost,
   useGetAllUsers,
   useGetCallerUserProfile,
   useGetFeed,
-  useSendMessage,
 } from "../hooks/useQueries";
 import { getInitials } from "../utils/format";
+
+const SHADOW_TAGS = [
+  "Student",
+  "Overthinker",
+  "Anonymous User",
+  "Dreamer",
+  "Night Owl",
+];
+
+function pickRandomTag(): string {
+  return SHADOW_TAGS[Math.floor(Math.random() * SHADOW_TAGS.length)];
+}
 
 // Sample posts shown when feed is empty
 const SAMPLE_POSTS = [
@@ -88,9 +99,11 @@ export default function FeedPage() {
   const { data: posts, isLoading: postsLoading } = useGetFeed();
   const { data: allUsers = [] } = useGetAllUsers();
   const createPost = useCreatePost();
+  const createDiscussionPost = useCreateDiscussionPost();
   const [postContent, setPostContent] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [postMode, setPostMode] = useState<"public" | "shadow">("public");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const currentUserId = identity?.getPrincipal().toString() || "";
@@ -115,16 +128,30 @@ export default function FeedPage() {
   const handlePost = async () => {
     if (!postContent.trim() && !selectedImage) return;
     try {
-      let imageBlob: ExternalBlob | null = null;
-      if (selectedImage) {
-        const bytes = new Uint8Array(await selectedImage.arrayBuffer());
-        imageBlob = ExternalBlob.fromBytes(bytes);
+      if (postMode === "shadow") {
+        const tag = pickRandomTag();
+        await createDiscussionPost.mutateAsync({
+          title: tag,
+          content: postContent.trim(),
+          category: "shadow",
+        });
+        toast.success("Posted anonymously to Real Talks!");
+      } else {
+        let imageBlob: ExternalBlob | null = null;
+        if (selectedImage) {
+          const bytes = new Uint8Array(await selectedImage.arrayBuffer());
+          imageBlob = ExternalBlob.fromBytes(bytes);
+        }
+        await createPost.mutateAsync({
+          content: postContent.trim(),
+          imageBlob,
+        });
+        toast.success("Post published!");
       }
-      await createPost.mutateAsync({ content: postContent.trim(), imageBlob });
       setPostContent("");
       setSelectedImage(null);
       setImagePreview(null);
-      toast.success("Post published!");
+      setPostMode("public");
     } catch {
       toast.error("Failed to create post. Please try again.");
     }
@@ -133,6 +160,7 @@ export default function FeedPage() {
   const avatarUrl = profile?.avatarBlob?.getDirectURL();
   const displayName = profile?.displayName || "You";
   const hasPosts = posts && posts.length > 0;
+  const isPosting = createPost.isPending || createDiscussionPost.isPending;
 
   return (
     <div className="max-w-[1100px] mx-auto px-4 py-6 space-y-4">
@@ -191,16 +219,57 @@ export default function FeedPage() {
         <main className="flex-1 min-w-0 space-y-4">
           {/* Composer */}
           <div className="bg-card border border-border rounded-xl shadow-card p-4">
+            {/* Mode toggle */}
+            <div className="flex gap-1.5 mb-3">
+              <button
+                type="button"
+                onClick={() => setPostMode("public")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                  postMode === "public"
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-transparent text-muted-foreground border-border hover:bg-accent"
+                }`}
+                data-ocid="feed.toggle"
+              >
+                🌐 Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setPostMode("shadow")}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                  postMode === "shadow"
+                    ? "bg-violet-600/80 text-white border-violet-500"
+                    : "bg-transparent text-muted-foreground border-border hover:bg-accent"
+                }`}
+                data-ocid="feed.toggle"
+              >
+                <Ghost className="h-3 w-3" />
+                Shadow
+              </button>
+            </div>
+
             <div className="flex gap-3">
-              <Avatar className="h-9 w-9 shrink-0">
-                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
-                <AvatarFallback className="text-xs font-semibold bg-primary/10 text-foreground">
-                  {getInitials(displayName)}
-                </AvatarFallback>
-              </Avatar>
+              {postMode === "shadow" ? (
+                <div className="w-9 h-9 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
+                  <Ghost className="h-4 w-4 text-violet-400" />
+                </div>
+              ) : (
+                <Avatar className="h-9 w-9 shrink-0">
+                  {avatarUrl && (
+                    <AvatarImage src={avatarUrl} alt={displayName} />
+                  )}
+                  <AvatarFallback className="text-xs font-semibold bg-primary/10 text-foreground">
+                    {getInitials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+              )}
               <div className="flex-1">
                 <Textarea
-                  placeholder="What's on your mind?"
+                  placeholder={
+                    postMode === "shadow"
+                      ? "Share anonymously — no one will know it's you..."
+                      : "What's on your mind?"
+                  }
                   value={postContent}
                   onChange={(e) => setPostContent(e.target.value)}
                   className="resize-none border-0 bg-accent/50 rounded-xl text-sm focus-visible:ring-1 focus-visible:ring-border min-h-[44px]"
@@ -209,7 +278,13 @@ export default function FeedPage() {
                     if (e.key === "Enter" && e.ctrlKey) handlePost();
                   }}
                 />
-                {imagePreview && (
+                {postMode === "shadow" && (
+                  <p className="text-[11px] text-violet-400/70 mt-1 flex items-center gap-1">
+                    <Ghost className="h-3 w-3" />
+                    This post will be anonymous in Real Talks
+                  </p>
+                )}
+                {imagePreview && postMode !== "shadow" && (
                   <div className="mt-2 relative inline-block">
                     <img
                       src={imagePreview}
@@ -229,15 +304,19 @@ export default function FeedPage() {
                   </div>
                 )}
                 <div className="flex items-center justify-between mt-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                    data-ocid="feed.upload_button"
-                  >
-                    <Image className="h-4 w-4" />
-                    <span>Photo</span>
-                  </button>
+                  {postMode !== "shadow" ? (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      data-ocid="feed.upload_button"
+                    >
+                      <Image className="h-4 w-4" />
+                      <span>Photo</span>
+                    </button>
+                  ) : (
+                    <span />
+                  )}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -247,20 +326,23 @@ export default function FeedPage() {
                   />
                   <Button
                     size="sm"
-                    className="rounded-full h-8 px-4 text-xs font-semibold"
+                    className={`rounded-full h-8 px-4 text-xs font-semibold ${
+                      postMode === "shadow"
+                        ? "bg-violet-600 hover:bg-violet-700 text-white border-0"
+                        : ""
+                    }`}
                     onClick={handlePost}
                     disabled={
-                      createPost.isPending ||
-                      (!postContent.trim() && !selectedImage)
+                      isPosting || (!postContent.trim() && !selectedImage)
                     }
                     data-ocid="feed.submit_button"
                   >
-                    {createPost.isPending ? (
+                    {isPosting ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
                     ) : (
                       <>
                         <Send className="h-3 w-3 mr-1" />
-                        Post
+                        {postMode === "shadow" ? "Post Anonymously" : "Post"}
                       </>
                     )}
                   </Button>
@@ -299,6 +381,7 @@ export default function FeedPage() {
                   authorId={post.author as unknown as Principal}
                   currentUserId={currentUserId}
                   index={i}
+                  userMap={userMap}
                 />
               ))}
             </div>

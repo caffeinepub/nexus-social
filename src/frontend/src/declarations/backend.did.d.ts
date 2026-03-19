@@ -35,6 +35,7 @@ export interface Post {
   'imageBlob' : [] | [ExternalBlob],
   'author' : UserId,
   'timestamp' : Time,
+  'category' : [] | [string],
 }
 export type Time = bigint;
 export type UserId = Principal;
@@ -76,7 +77,9 @@ export interface _SERVICE {
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
   'addComment' : ActorMethod<[bigint, string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'createDiscussionPost' : ActorMethod<[string, string, string], bigint>,
   'createPost' : ActorMethod<[string, [] | [ExternalBlob]], bigint>,
+  'deletePost' : ActorMethod<[bigint], undefined>,
   'followUser' : ActorMethod<[UserId], undefined>,
   'getAllPosts' : ActorMethod<[], Array<Post>>,
   'getAllUsers' : ActorMethod<[], Array<[UserId, UserProfile]>>,
@@ -90,11 +93,11 @@ export interface _SERVICE {
   'getMessages' : ActorMethod<[UserId], Array<Message>>,
   'getNotifications' : ActorMethod<[], Array<Notification>>,
   'getPost' : ActorMethod<[bigint], Post>,
+  'getPostsByCategory' : ActorMethod<[string], Array<Post>>,
   'getProfile' : ActorMethod<[UserId], UserProfile>,
   'getUserFeed' : ActorMethod<[UserId], Array<Post>>,
   'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'deletePost' : ActorMethod<[bigint], undefined>,
   'likePost' : ActorMethod<[bigint], undefined>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'sendMessage' : ActorMethod<[UserId, string], undefined>,

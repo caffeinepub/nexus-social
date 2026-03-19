@@ -16,9 +16,10 @@ import { useUpdateProfile } from "../hooks/useQueries";
 
 interface Props {
   open: boolean;
+  onSuccess?: () => void;
 }
 
-export default function ProfileSetupModal({ open }: Props) {
+export default function ProfileSetupModal({ open, onSuccess }: Props) {
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const updateProfile = useUpdateProfile();
@@ -33,6 +34,7 @@ export default function ProfileSetupModal({ open }: Props) {
         avatarBlob: null,
       });
       toast.success("Profile created! Welcome to Nexus.");
+      onSuccess?.();
     } catch {
       toast.error("Failed to save profile. Please try again.");
     }
