@@ -21,7 +21,6 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Types
   type UserId = Principal;
 
   type UserProfile = {
@@ -60,7 +59,12 @@ actor {
     timestamp : Time.Time;
   };
 
-  // Storage
+  func requireAuth(caller : Principal) {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Must be logged in");
+    };
+  };
+
   let userProfiles = Map.empty<UserId, UserProfile>();
   var nextPostId = 0;
   let posts = Map.empty<Nat, Post>();
@@ -70,51 +74,34 @@ actor {
   let messages = Map.empty<UserId, List.List<Message>>();
   let notifications = Map.empty<UserId, List.List<Notification>>();
 
-  // Profile
   public shared ({ caller }) func updateProfile(displayName : Text, bio : Text, avatarBlob : ?Storage.ExternalBlob) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can update profile");
-    };
-
-    let profile : UserProfile = {
-      displayName;
-      bio;
-      avatarBlob;
-    };
+    requireAuth(caller);
+    let profile : UserProfile = { displayName; bio; avatarBlob };
     userProfiles.add(caller, profile);
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can get profiles");
-    };
+    if (caller.isAnonymous()) { return null };
     userProfiles.get(caller);
   };
 
-  public query ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+  public query (_) func saveCallerUserProfile(_profile : UserProfile) : async () {
     Runtime.trap("Use updateProfile instead");
   };
 
-  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
+  public query ({ caller = _ }) func getUserProfile(user : Principal) : async ?UserProfile {
     userProfiles.get(user);
   };
 
-  public query ({ caller }) func getProfile(userId : UserId) : async UserProfile {
+  public query ({ caller = _ }) func getProfile(userId : UserId) : async UserProfile {
     switch (userProfiles.get(userId)) {
       case (null) { Runtime.trap("Profile not found") };
       case (?profile) { profile };
     };
   };
 
-  // Posts
   public shared ({ caller }) func createPost(content : Text, imageBlob : ?Storage.ExternalBlob) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create posts");
-    };
-
+    requireAuth(caller);
     let post : Post = {
       id = nextPostId;
       author = caller;
@@ -123,17 +110,13 @@ actor {
       timestamp = Time.now();
       category = null;
     };
-
     posts.add(nextPostId, post);
     nextPostId += 1;
     post.id;
   };
 
   public shared ({ caller }) func createDiscussionPost(title : Text, content : Text, category : Text) : async Nat {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create discussion posts");
-    };
-
+    requireAuth(caller);
     let post : Post = {
       id = nextPostId;
       author = caller;
@@ -142,13 +125,12 @@ actor {
       timestamp = Time.now();
       category = ?category;
     };
-
     posts.add(nextPostId, post);
     nextPostId += 1;
     post.id;
   };
 
-  public query ({ caller }) func getPostsByCategory(category : Text) : async [Post] {
+  public query ({ caller = _ }) func getPostsByCategory(category : Text) : async [Post] {
     let filteredPosts = posts.values().filter(
       func(post) {
         switch (post.category) {
@@ -160,18 +142,14 @@ actor {
     filteredPosts.toArray().sort(
       func(post1, post2) {
         if (post1.timestamp > post2.timestamp) { #less } else {
-          if (post1.timestamp < post2.timestamp) { #greater } else {
-            #equal;
-          };
+          if (post1.timestamp < post2.timestamp) { #greater } else { #equal };
         };
       }
     );
   };
 
   public shared ({ caller }) func deletePost(postId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can delete posts");
-    };
+    requireAuth(caller);
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
       case (?post) {
@@ -185,149 +163,94 @@ actor {
     };
   };
 
-  public query ({ caller }) func getPost(postId : Nat) : async Post {
+  public query ({ caller = _ }) func getPost(postId : Nat) : async Post {
     switch (posts.get(postId)) {
       case (null) { Runtime.trap("Post not found") };
       case (?post) { post };
     };
   };
 
-  public query ({ caller }) func getAllPosts() : async [Post] {
+  public query ({ caller = _ }) func getAllPosts() : async [Post] {
     posts.values().toArray();
   };
 
-  // Likes
   public shared ({ caller }) func likePost(postId : Nat) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can like posts");
-    };
-
+    requireAuth(caller);
     let currentLikes = switch (likes.get(postId)) {
       case (null) { Set.empty<UserId>() };
       case (?set) { set };
     };
-
     if (currentLikes.contains(caller)) { Runtime.trap("Already liked") };
-
     currentLikes.add(caller);
     likes.add(postId, currentLikes);
-
-    // Notification
-    sendNotification(
-      caller,
-      postId,
-      "Your post was liked!"
-    );
+    sendNotification(caller, postId, "Your post was liked!");
   };
 
-  public query ({ caller }) func getLikes(postId : Nat) : async Nat {
+  public query ({ caller = _ }) func getLikes(postId : Nat) : async Nat {
     switch (likes.get(postId)) {
       case (null) { 0 };
       case (?set) { set.size() };
     };
   };
 
-  // Comments
   public shared ({ caller }) func addComment(postId : Nat, content : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can comment");
-    };
-
-    let comment : Comment = {
-      postId;
-      author = caller;
-      content;
-      timestamp = Time.now();
-    };
-
+    requireAuth(caller);
+    let comment : Comment = { postId; author = caller; content; timestamp = Time.now() };
     let existingComments = switch (comments.get(postId)) {
       case (null) { List.empty<Comment>() };
       case (?list) { list };
     };
-
     existingComments.add(comment);
     comments.add(postId, existingComments);
-
-    // Notification
-    sendNotification(
-      caller,
-      postId,
-      "You received a new comment!"
-    );
+    sendNotification(caller, postId, "You received a new comment!");
   };
 
-  public query ({ caller }) func getComments(postId : Nat) : async [Comment] {
+  public query ({ caller = _ }) func getComments(postId : Nat) : async [Comment] {
     switch (comments.get(postId)) {
       case (null) { [] };
       case (?list) { list.toArray() };
     };
   };
 
-  // Follows
   public shared ({ caller }) func followUser(target : UserId) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can follow others");
-    };
-
+    requireAuth(caller);
     let currentFollowers = switch (followers.get(target)) {
       case (null) { Set.empty<UserId>() };
       case (?set) { set };
     };
-
     if (currentFollowers.contains(caller)) { Runtime.trap("Already following") };
-
     currentFollowers.add(caller);
     followers.add(target, currentFollowers);
-
-    sendUserNotification(
-      target,
-      "You have a new follower!"
-    );
+    sendUserNotification(target, "You have a new follower!");
   };
 
   public shared ({ caller }) func unfollowUser(target : UserId) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can unfollow");
-    };
-
+    requireAuth(caller);
     switch (followers.get(target)) {
       case (null) { Runtime.trap("Not following") };
       case (?set) {
         if (set.contains(caller)) {
           set.remove(caller);
           followers.add(target, set);
-        } else {
-          Runtime.trap("Not following");
-        };
+        } else { Runtime.trap("Not following") };
       };
     };
   };
 
-  public query ({ caller }) func getFollowers(userId : UserId) : async [UserId] {
+  public query ({ caller = _ }) func getFollowers(userId : UserId) : async [UserId] {
     switch (followers.get(userId)) {
       case (null) { [] };
       case (?set) { set.values().toArray() };
     };
   };
 
-  // Messages
   public shared ({ caller }) func sendMessage(recipient : UserId, content : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can send messages");
-    };
-
-    let message : Message = {
-      sender = caller;
-      recipient;
-      content;
-      timestamp = Time.now();
-    };
-
+    requireAuth(caller);
+    let message : Message = { sender = caller; recipient; content; timestamp = Time.now() };
     let existingMessages = switch (messages.get(recipient)) {
       case (null) { List.empty<Message>() };
       case (?list) { list };
     };
-
     existingMessages.add(message);
     messages.add(recipient, existingMessages);
   };
@@ -336,14 +259,12 @@ actor {
     if (caller != userId and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own messages");
     };
-
     switch (messages.get(userId)) {
       case (null) { [] };
       case (?list) { list.toArray() };
     };
   };
 
-  // Notifications
   func sendNotification(caller : UserId, postId : Nat, message : Text) {
     switch (posts.get(postId)) {
       case (null) { () };
@@ -358,70 +279,48 @@ actor {
       message;
       timestamp = Time.now();
     };
-
     let existingNotifications = switch (notifications.get(user)) {
       case (null) { List.empty<Notification>() };
       case (?list) { list };
     };
-
     existingNotifications.add(notification);
     notifications.add(user, existingNotifications);
   };
 
   public query ({ caller }) func getNotifications() : async [Notification] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view notifications");
-    };
-
+    if (caller.isAnonymous()) { return [] };
     switch (notifications.get(caller)) {
       case (null) { [] };
-      case (?list) {
-        let array = list.toArray();
-        let reversed = array.reverse();
-        reversed;
-      };
+      case (?list) { list.toArray().reverse() };
     };
   };
 
-  // Feeds and Discovery
   module Post {
     public func compareByTimeDesc(post1 : Post, post2 : Post) : Order.Order {
       if (post1.timestamp > post2.timestamp) { #less } else {
-        if (post1.timestamp < post2.timestamp) { #greater } else {
-          #equal;
-        };
+        if (post1.timestamp < post2.timestamp) { #greater } else { #equal };
       };
     };
   };
 
-  public query ({ caller }) func getFeed() : async [Post] {
+  public query ({ caller = _ }) func getFeed() : async [Post] {
     posts.values().toArray().sort(Post.compareByTimeDesc);
   };
 
-  public query ({ caller }) func getUserFeed(userId : UserId) : async [Post] {
-    let filteredPosts = posts.values().filter(
-      func(post) { post.author == userId }
-    );
-    filteredPosts.toArray().sort(Post.compareByTimeDesc);
+  public query ({ caller = _ }) func getUserFeed(userId : UserId) : async [Post] {
+    posts.values().filter(func(post) { post.author == userId }).toArray().sort(Post.compareByTimeDesc);
   };
 
   public query ({ caller }) func getFollowedFeed() : async [Post] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can view followed feed");
-    };
-
+    if (caller.isAnonymous()) { return [] };
     let followedUsers = switch (followers.get(caller)) {
       case (null) { Set.empty<UserId>() };
       case (?set) { set };
     };
-
-    let filteredPosts = posts.values().filter(
-      func(post) { followedUsers.contains(post.author) }
-    );
-    filteredPosts.toArray().sort(Post.compareByTimeDesc);
+    posts.values().filter(func(post) { followedUsers.contains(post.author) }).toArray().sort(Post.compareByTimeDesc);
   };
 
-  public query ({ caller }) func getAllUsers() : async [(UserId, UserProfile)] {
+  public query ({ caller = _ }) func getAllUsers() : async [(UserId, UserProfile)] {
     userProfiles.toArray();
   };
 };
